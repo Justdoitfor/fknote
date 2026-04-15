@@ -35,7 +35,7 @@
   --vp-c-danger-soft: rgba(255, 198, 198, 0.65);
 
   --vp-layout-max-width: 1920px;
-  --vp-sidebar-width: 264px;
+  --vp-sidebar-width: 396px;
 }
 
 html {
@@ -283,21 +283,21 @@ div[class*='language-'] {
   }
 
   .VPDoc.has-aside .content-container {
-    max-width: 980px;
+    max-width: 1160px;
   }
 
   .VPDoc .content {
-    min-width: 760px;
+    min-width: 880px;
   }
 }
 
 @media (min-width: 960px) {
   .VPDoc {
-    padding: 40px 24px 0 !important;
+    padding: 36px 18px 0 !important;
   }
 
   .VPDoc .content {
-    padding: 0 24px 96px !important;
+    padding: 0 18px 96px !important;
   }
 }
 
