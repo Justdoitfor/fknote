@@ -14,6 +14,9 @@ const STORAGE_KEY = 'fknote_docs_v1'
 const GIST_TOKEN_KEY = 'fknote_gist_token_v1'
 const GIST_ID_KEY = 'fknote_gist_id_v1'
 const GIST_FILE_NAME = 'fknote.json'
+const REPO_OWNER_KEY = 'fknote_repo_owner_v1'
+const REPO_NAME_KEY = 'fknote_repo_name_v1'
+const REPO_BRANCH_KEY = 'fknote_repo_branch_v1'
 
 function now() {
   return Date.now()
@@ -82,6 +85,14 @@ const cloudState = ref<'idle' | 'working' | 'ok' | 'error'>('idle')
 const cloudMessage = ref('')
 const cloudAt = ref<number>(0)
 
+const repoOwner = ref('')
+const repoName = ref('')
+const repoBranch = ref('main')
+const publishType = ref<'tutorial' | 'note'>('tutorial')
+const publishSlug = ref('')
+const publishState = ref<'idle' | 'working' | 'ok' | 'error'>('idle')
+const publishMessage = ref('')
+
 let saveTimer: number | undefined
 
 function formatTime(ts: number) {
@@ -107,6 +118,36 @@ function mergeDocs(localDocs: Doc[], remoteDocs: Doc[]) {
   return Array.from(map.values()).sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
+function encodePath(p: string) {
+  return p
+    .split('/')
+    .map((s) => encodeURIComponent(s))
+    .join('/')
+}
+
+function base64Utf8(input: string) {
+  const bytes = encodeURIComponent(input).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+    String.fromCharCode(parseInt(p1, 16))
+  )
+  return btoa(bytes)
+}
+
+function sanitizeSlug(raw: string) {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64)
+}
+
+function ensureFrontmatter(src: string, pageTitle: string) {
+  const s = src.trimStart()
+  if (s.startsWith('---\n')) return src
+  const t = pageTitle.trim() || '未命名'
+  return `---\ntitle: ${t.replace(/\n/g, ' ')}\n---\n\n${src}`
+}
+
 async function githubJson<T>(url: string, init: RequestInit = {}) {
   const token = gistToken.value.trim()
   if (!token) throw new Error('请先填写 GitHub Token')
@@ -123,6 +164,19 @@ async function githubJson<T>(url: string, init: RequestInit = {}) {
     throw new Error(text || `请求失败 (${res.status})`)
   }
   return (await res.json()) as T
+}
+
+async function githubRequest(url: string, init: RequestInit = {}) {
+  const token = gistToken.value.trim()
+  if (!token) throw new Error('请先填写 GitHub Token')
+  return await fetch(url, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`
+    }
+  })
 }
 
 async function ensureGist() {
@@ -210,6 +264,77 @@ function cloudClearCredentials() {
   saveString(GIST_ID_KEY, '')
   cloudState.value = 'idle'
   cloudMessage.value = ''
+}
+
+function repoSaveSettings() {
+  saveString(REPO_OWNER_KEY, repoOwner.value.trim())
+  saveString(REPO_NAME_KEY, repoName.value.trim())
+  saveString(REPO_BRANCH_KEY, repoBranch.value.trim())
+  publishState.value = 'ok'
+  publishMessage.value = '仓库配置已保存到本地'
+}
+
+function repoPathForCurrentDoc() {
+  const owner = repoOwner.value.trim()
+  const repo = repoName.value.trim()
+  if (!owner || !repo) return ''
+  const slug = sanitizeSlug(publishSlug.value || title.value || 'note')
+  if (!slug) return ''
+  if (publishType.value === 'tutorial') return `docs/tutorials/${slug}/index.md`
+  return `docs/notes/${slug}.md`
+}
+
+async function repoUpsertFile(filePath: string, fileContent: string) {
+  const owner = repoOwner.value.trim()
+  const repo = repoName.value.trim()
+  const branch = repoBranch.value.trim() || 'main'
+  if (!owner || !repo) throw new Error('请先填写 Owner/Repo')
+
+  const apiPath = encodePath(filePath)
+  const base = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
+  const getUrl = `${base}/contents/${apiPath}?ref=${encodeURIComponent(branch)}`
+
+  const getRes = await githubRequest(getUrl, { method: 'GET' })
+  const existing = getRes.status === 200 ? ((await getRes.json()) as { sha: string }) : null
+  if (getRes.status !== 200 && getRes.status !== 404) {
+    const t = await getRes.text().catch(() => '')
+    throw new Error(t || `读取失败 (${getRes.status})`)
+  }
+
+  const putUrl = `${base}/contents/${apiPath}`
+  const body: Record<string, any> = {
+    message: `docs: publish ${title.value.trim() || 'note'}`,
+    content: base64Utf8(fileContent),
+    branch
+  }
+  if (existing?.sha) body.sha = existing.sha
+
+  const putRes = await githubRequest(putUrl, {
+    method: 'PUT',
+    body: JSON.stringify(body)
+  })
+
+  if (!putRes.ok) {
+    const t = await putRes.text().catch(() => '')
+    throw new Error(t || `发布失败 (${putRes.status})`)
+  }
+}
+
+async function publishToRepo() {
+  publishState.value = 'working'
+  publishMessage.value = '发布中…'
+  try {
+    const filePath = repoPathForCurrentDoc()
+    if (!filePath) throw new Error('请先填写仓库信息与 slug')
+    const pageTitle = title.value.trim() || '未命名'
+    const fileContent = ensureFrontmatter(content.value, pageTitle)
+    await repoUpsertFile(filePath, fileContent)
+    publishState.value = 'ok'
+    publishMessage.value = `已发布：${filePath}`
+  } catch (e) {
+    publishState.value = 'error'
+    publishMessage.value = e instanceof Error ? e.message : '发布失败'
+  }
 }
 
 function commitToList(next: Partial<Doc>) {
@@ -353,6 +478,9 @@ onMounted(() => {
   docs.value = loadDocs()
   gistToken.value = loadString(GIST_TOKEN_KEY)
   gistId.value = loadString(GIST_ID_KEY)
+  repoOwner.value = loadString(REPO_OWNER_KEY) || 'Justdoitfor'
+  repoName.value = loadString(REPO_NAME_KEY) || 'fknote'
+  repoBranch.value = loadString(REPO_BRANCH_KEY) || 'main'
   if (!docs.value.length) createDoc('daily')
   else {
     activeId.value = docs.value[0].id
@@ -396,6 +524,22 @@ const saveLabel = computed(() => {
             <button class="btn danger" type="button" @click="cloudClearCredentials">清除</button>
           </div>
           <div v-if="cloudMessage" class="cloud-status" :class="{ err: cloudState === 'error' }">{{ cloudMessage }}</div>
+        </div>
+        <div class="cloud">
+          <div class="cloud-title">发布到仓库（GitHub）</div>
+          <input v-model="repoOwner" class="cloud-input" placeholder="Owner（例如 Justdoitfor）" />
+          <input v-model="repoName" class="cloud-input" placeholder="Repo（例如 fknote）" />
+          <input v-model="repoBranch" class="cloud-input" placeholder="Branch（例如 main）" />
+          <select v-model="publishType" class="cloud-input">
+            <option value="tutorial">教程目录（/tutorials/slug/index.md）</option>
+            <option value="note">日常笔记（/notes/slug.md）</option>
+          </select>
+          <input v-model="publishSlug" class="cloud-input" placeholder="slug（留空用标题自动生成）" />
+          <div class="cloud-actions">
+            <button class="btn ghost" type="button" @click="repoSaveSettings">保存配置</button>
+            <button class="btn" type="button" :disabled="publishState === 'working'" @click="publishToRepo">发布</button>
+          </div>
+          <div v-if="publishMessage" class="cloud-status" :class="{ err: publishState === 'error' }">{{ publishMessage }}</div>
         </div>
       </div>
 
@@ -447,7 +591,7 @@ const saveLabel = computed(() => {
 <style scoped>
 .composer {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 18px;
   align-items: start;
 }

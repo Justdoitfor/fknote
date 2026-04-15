@@ -271,6 +271,10 @@ div[class*='language-'] {
 }
 
 @media (min-width: 1280px) {
+  .VPDoc .container {
+    justify-content: flex-start;
+  }
+
   .VPDoc .aside {
     max-width: 256px;
     padding-left: 28px;
@@ -283,11 +287,11 @@ div[class*='language-'] {
   }
 
   .VPDoc.has-aside .content-container {
-    max-width: 1160px;
+    max-width: 1320px;
   }
 
   .VPDoc .content {
-    min-width: 880px;
+    min-width: 980px;
   }
 }
 

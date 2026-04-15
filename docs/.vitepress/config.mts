@@ -1,4 +1,111 @@
 import { defineConfig } from 'vitepress'
+import fs from 'node:fs'
+import path from 'node:path'
+
+type SidebarItem = {
+  text: string
+  link?: string
+  collapsed?: boolean
+  items?: SidebarItem[]
+}
+
+const docsRoot = path.resolve(__dirname, '..')
+const tutorialsRoot = path.resolve(docsRoot, 'tutorials')
+
+function normalizeTitle(raw: string) {
+  const t = raw.trim()
+  if (!t) return ''
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    return t.slice(1, -1).trim()
+  }
+  return t
+}
+
+function readDocTitle(filePath: string, fallback: string) {
+  try {
+    const src = fs.readFileSync(filePath, 'utf8')
+    const fm = src.match(/^---\n([\s\S]*?)\n---\n/)
+    if (fm) {
+      const m = fm[1].match(/(?:^|\n)title:\s*(.+?)(?:\n|$)/)
+      if (m) return normalizeTitle(m[1]) || fallback
+    }
+    const h1 = src.match(/(?:^|\n)#\s+(.+?)(?:\n|$)/)
+    if (h1) return normalizeTitle(h1[1]) || fallback
+    return fallback
+  } catch {
+    return fallback
+  }
+}
+
+function toTextFromSlug(slug: string) {
+  const s = slug.replace(/[-_]+/g, ' ').trim()
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : slug
+}
+
+function listMarkdownFiles(dir: string) {
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isFile() && e.name.endsWith('.md'))
+      .map((e) => e.name)
+  } catch {
+    return []
+  }
+}
+
+function listDirs(dir: string) {
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+      .map((e) => e.name)
+  } catch {
+    return []
+  }
+}
+
+function buildPublishedTutorialsSidebar(exclude: Set<string>): SidebarItem[] {
+  const items: SidebarItem[] = []
+
+  const rootFiles = listMarkdownFiles(tutorialsRoot)
+    .filter((name) => !exclude.has(name))
+    .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+
+  for (const file of rootFiles) {
+    const slug = file.replace(/\.md$/, '')
+    const title = readDocTitle(path.resolve(tutorialsRoot, file), toTextFromSlug(slug))
+    items.push({ text: title, link: `/tutorials/${slug}` })
+  }
+
+  const dirs = listDirs(tutorialsRoot).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  for (const dir of dirs) {
+    const folder = path.resolve(tutorialsRoot, dir)
+    const files = listMarkdownFiles(folder).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+    if (!files.length) continue
+
+    const indexFile = files.find((f) => f === 'index.md')
+    const indexTitle = indexFile
+      ? readDocTitle(path.resolve(folder, indexFile), toTextFromSlug(dir))
+      : toTextFromSlug(dir)
+
+    const children: SidebarItem[] = []
+    for (const f of files) {
+      if (f === 'index.md') continue
+      const pageSlug = f.replace(/\.md$/, '')
+      const pageTitle = readDocTitle(path.resolve(folder, f), toTextFromSlug(pageSlug))
+      children.push({ text: pageTitle, link: `/tutorials/${dir}/${pageSlug}` })
+    }
+
+    const parent: SidebarItem = {
+      text: indexTitle,
+      link: indexFile ? `/tutorials/${dir}/` : undefined
+    }
+    if (children.length) parent.items = children
+    items.push(parent)
+  }
+
+  return items
+}
 
 export default defineConfig({
   lang: 'zh-CN',
@@ -29,6 +136,19 @@ export default defineConfig({
             { text: '展示页', link: '/tutorials/showcase' },
             { text: '长文示例', link: '/tutorials/sample-long' }
           ]
+        },
+        {
+          text: '在线发布',
+          collapsed: true,
+          items: buildPublishedTutorialsSidebar(
+            new Set([
+              'getting-started.md',
+              'organize.md',
+              'writing.md',
+              'showcase.md',
+              'sample-long.md'
+            ])
+          )
         }
       ],
       '/notes/': [
