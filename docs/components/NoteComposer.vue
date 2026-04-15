@@ -14,9 +14,9 @@ const STORAGE_KEY = 'fknote_docs_v1'
 const GIST_TOKEN_KEY = 'fknote_gist_token_v1'
 const GIST_ID_KEY = 'fknote_gist_id_v1'
 const GIST_FILE_NAME = 'fknote.json'
-const REPO_OWNER_KEY = 'fknote_repo_owner_v1'
-const REPO_NAME_KEY = 'fknote_repo_name_v1'
-const REPO_BRANCH_KEY = 'fknote_repo_branch_v1'
+const PUBLISH_REPO_OWNER = 'Justdoitfor'
+const PUBLISH_REPO_NAME = 'fknote'
+const PUBLISH_REPO_BRANCH = 'main'
 
 function now() {
   return Date.now()
@@ -85,9 +85,6 @@ const cloudState = ref<'idle' | 'working' | 'ok' | 'error'>('idle')
 const cloudMessage = ref('')
 const cloudAt = ref<number>(0)
 
-const repoOwner = ref('')
-const repoName = ref('')
-const repoBranch = ref('main')
 const publishType = ref<'tutorial' | 'note'>('tutorial')
 const publishSlug = ref('')
 const publishState = ref<'idle' | 'working' | 'ok' | 'error'>('idle')
@@ -266,18 +263,7 @@ function cloudClearCredentials() {
   cloudMessage.value = ''
 }
 
-function repoSaveSettings() {
-  saveString(REPO_OWNER_KEY, repoOwner.value.trim())
-  saveString(REPO_NAME_KEY, repoName.value.trim())
-  saveString(REPO_BRANCH_KEY, repoBranch.value.trim())
-  publishState.value = 'ok'
-  publishMessage.value = '仓库配置已保存到本地'
-}
-
 function repoPathForCurrentDoc() {
-  const owner = repoOwner.value.trim()
-  const repo = repoName.value.trim()
-  if (!owner || !repo) return ''
   const slug = sanitizeSlug(publishSlug.value || title.value || 'note')
   if (!slug) return ''
   if (publishType.value === 'tutorial') return `docs/tutorials/${slug}/index.md`
@@ -285,10 +271,9 @@ function repoPathForCurrentDoc() {
 }
 
 async function repoUpsertFile(filePath: string, fileContent: string) {
-  const owner = repoOwner.value.trim()
-  const repo = repoName.value.trim()
-  const branch = repoBranch.value.trim() || 'main'
-  if (!owner || !repo) throw new Error('请先填写 Owner/Repo')
+  const owner = PUBLISH_REPO_OWNER
+  const repo = PUBLISH_REPO_NAME
+  const branch = PUBLISH_REPO_BRANCH
 
   const apiPath = encodePath(filePath)
   const base = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
@@ -325,7 +310,7 @@ async function publishToRepo() {
   publishMessage.value = '发布中…'
   try {
     const filePath = repoPathForCurrentDoc()
-    if (!filePath) throw new Error('请先填写仓库信息与 slug')
+    if (!filePath) throw new Error('请先填写 slug 或标题')
     const pageTitle = title.value.trim() || '未命名'
     const fileContent = ensureFrontmatter(content.value, pageTitle)
     await repoUpsertFile(filePath, fileContent)
@@ -478,9 +463,6 @@ onMounted(() => {
   docs.value = loadDocs()
   gistToken.value = loadString(GIST_TOKEN_KEY)
   gistId.value = loadString(GIST_ID_KEY)
-  repoOwner.value = loadString(REPO_OWNER_KEY) || 'Justdoitfor'
-  repoName.value = loadString(REPO_NAME_KEY) || 'fknote'
-  repoBranch.value = loadString(REPO_BRANCH_KEY) || 'main'
   if (!docs.value.length) createDoc('daily')
   else {
     activeId.value = docs.value[0].id
@@ -502,65 +484,6 @@ const saveLabel = computed(() => {
 
 <template>
   <div class="composer">
-    <aside class="rail">
-      <div class="rail-top">
-        <div class="rail-title">本地文档</div>
-        <div class="rail-actions">
-          <button class="btn ghost" type="button" @click="createDoc('daily')">新建日记</button>
-          <button class="btn" type="button" @click="createDoc('tutorial')">新建教程</button>
-        </div>
-        <label class="import">
-          <input type="file" accept=".md,text/markdown" @change="(e) => (e.target && (e.target as HTMLInputElement).files?.[0] ? importMarkdown((e.target as HTMLInputElement).files![0]) : null)" />
-          导入 Markdown
-        </label>
-        <div class="cloud">
-          <div class="cloud-title">云端同步（GitHub Gist）</div>
-          <input v-model="gistToken" class="cloud-input" type="password" placeholder="GitHub Token（gist 读写）" />
-          <input v-model="gistId" class="cloud-input" placeholder="Gist ID（可留空自动创建）" />
-          <div class="cloud-actions">
-            <button class="btn ghost" type="button" @click="cloudSaveCredentials">保存凭证</button>
-            <button class="btn ghost" type="button" :disabled="cloudState === 'working'" @click="cloudPull">从云端拉取</button>
-            <button class="btn" type="button" :disabled="cloudState === 'working'" @click="cloudPush">同步到云端</button>
-            <button class="btn danger" type="button" @click="cloudClearCredentials">清除</button>
-          </div>
-          <div v-if="cloudMessage" class="cloud-status" :class="{ err: cloudState === 'error' }">{{ cloudMessage }}</div>
-        </div>
-        <div class="cloud">
-          <div class="cloud-title">发布到仓库（GitHub）</div>
-          <input v-model="repoOwner" class="cloud-input" placeholder="Owner（例如 Justdoitfor）" />
-          <input v-model="repoName" class="cloud-input" placeholder="Repo（例如 fknote）" />
-          <input v-model="repoBranch" class="cloud-input" placeholder="Branch（例如 main）" />
-          <select v-model="publishType" class="cloud-input">
-            <option value="tutorial">教程目录（/tutorials/slug/index.md）</option>
-            <option value="note">日常笔记（/notes/slug.md）</option>
-          </select>
-          <input v-model="publishSlug" class="cloud-input" placeholder="slug（留空用标题自动生成）" />
-          <div class="cloud-actions">
-            <button class="btn ghost" type="button" @click="repoSaveSettings">保存配置</button>
-            <button class="btn" type="button" :disabled="publishState === 'working'" @click="publishToRepo">发布</button>
-          </div>
-          <div v-if="publishMessage" class="cloud-status" :class="{ err: publishState === 'error' }">{{ publishMessage }}</div>
-        </div>
-      </div>
-
-      <div class="rail-list">
-        <button
-          v-for="d in docs"
-          :key="d.id"
-          class="doc"
-          :class="{ active: d.id === activeId }"
-          type="button"
-          @click="setActive(d.id)"
-        >
-          <div class="doc-title">{{ d.title }}</div>
-          <div class="doc-meta">
-            <span>{{ formatTime(d.updatedAt) }}</span>
-            <span v-if="d.tags.length">· {{ d.tags.slice(0, 2).join(', ') }}</span>
-          </div>
-        </button>
-      </div>
-    </aside>
-
     <section class="main" v-if="activeDoc">
       <header class="topbar">
         <div class="fields">
@@ -585,20 +508,79 @@ const saveLabel = computed(() => {
         <div v-else class="preview vp-doc" v-html="previewHtml" />
       </div>
     </section>
+
+    <aside class="rail">
+      <div class="rail-top">
+        <div class="rail-title">本地文档</div>
+        <div class="rail-actions">
+          <button class="btn ghost" type="button" @click="createDoc('daily')">新建日记</button>
+          <button class="btn" type="button" @click="createDoc('tutorial')">新建教程</button>
+        </div>
+        <label class="import">
+          <input type="file" accept=".md,text/markdown" @change="(e) => (e.target && (e.target as HTMLInputElement).files?.[0] ? importMarkdown((e.target as HTMLInputElement).files![0]) : null)" />
+          导入 Markdown
+        </label>
+        <div class="cloud">
+          <div class="cloud-title">云端同步（GitHub Gist）</div>
+          <input v-model="gistToken" class="cloud-input" type="password" placeholder="GitHub Token（gist 读写）" />
+          <input v-model="gistId" class="cloud-input" placeholder="Gist ID（可留空自动创建）" />
+          <div class="cloud-actions">
+            <button class="btn ghost" type="button" @click="cloudSaveCredentials">保存凭证</button>
+            <button class="btn ghost" type="button" :disabled="cloudState === 'working'" @click="cloudPull">从云端拉取</button>
+            <button class="btn" type="button" :disabled="cloudState === 'working'" @click="cloudPush">同步到云端</button>
+            <button class="btn danger" type="button" @click="cloudClearCredentials">清除</button>
+          </div>
+          <div v-if="cloudMessage" class="cloud-status" :class="{ err: cloudState === 'error' }">{{ cloudMessage }}</div>
+        </div>
+        <div class="cloud">
+          <div class="cloud-title">发布（写入仓库）</div>
+          <select v-model="publishType" class="cloud-input">
+            <option value="tutorial">教程目录（/tutorials/slug/index.md）</option>
+            <option value="note">日常笔记（/notes/slug.md）</option>
+          </select>
+          <input v-model="publishSlug" class="cloud-input" placeholder="slug（留空用标题自动生成）" />
+          <div class="cloud-actions">
+            <button class="btn" type="button" :disabled="publishState === 'working'" @click="publishToRepo">发布</button>
+            <a class="btn ghost" :href="publishType === 'tutorial' ? '/tutorials/' : '/notes/'">查看</a>
+          </div>
+          <div v-if="publishMessage" class="cloud-status" :class="{ err: publishState === 'error' }">{{ publishMessage }}</div>
+        </div>
+      </div>
+
+      <div class="rail-list">
+        <button
+          v-for="d in docs"
+          :key="d.id"
+          class="doc"
+          :class="{ active: d.id === activeId }"
+          type="button"
+          @click="setActive(d.id)"
+        >
+          <div class="doc-title">{{ d.title }}</div>
+          <div class="doc-meta">
+            <span>{{ formatTime(d.updatedAt) }}</span>
+            <span v-if="d.tags.length">· {{ d.tags.slice(0, 2).join(', ') }}</span>
+          </div>
+        </button>
+      </div>
+    </aside>
+
   </div>
 </template>
 
 <style scoped>
 .composer {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 1fr 320px;
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
+  min-height: calc(100svh - var(--vp-nav-height) - 120px);
 }
 
 @media (max-width: 960px) {
   .composer {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
 }
 
@@ -607,6 +589,8 @@ const saveLabel = computed(() => {
   box-shadow: rgb(224, 226, 232) 0px 0px 0px 1px;
   background: rgba(255, 255, 255, 0.8);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .rail-top {
@@ -622,10 +606,14 @@ const saveLabel = computed(() => {
 }
 
 .rail-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
-  flex-wrap: wrap;
   margin-bottom: 10px;
+}
+
+.rail-actions .btn {
+  width: 100%;
 }
 
 .import {
@@ -639,6 +627,8 @@ const saveLabel = computed(() => {
   color: var(--vp-c-text-2);
   cursor: pointer;
   background: rgba(195, 250, 245, 0.25);
+  width: 100%;
+  justify-content: center;
 }
 
 .import input {
@@ -694,8 +684,9 @@ const saveLabel = computed(() => {
   display: grid;
   padding: 10px;
   gap: 10px;
-  max-height: 520px;
   overflow: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .doc {
@@ -733,6 +724,8 @@ const saveLabel = computed(() => {
   box-shadow: rgb(224, 226, 232) 0px 0px 0px 1px;
   background: rgba(255, 255, 255, 0.86);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar {
@@ -809,11 +802,15 @@ const saveLabel = computed(() => {
 
 .panel {
   padding: 14px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
 }
 
 .editor {
   width: 100%;
-  min-height: 520px;
+  min-height: 0;
+  flex: 1;
   resize: vertical;
   border-radius: 16px;
   box-shadow: rgb(224, 226, 232) 0px 0px 0px 1px;
@@ -829,6 +826,9 @@ const saveLabel = computed(() => {
   box-shadow: rgb(224, 226, 232) 0px 0px 0px 1px;
   background: rgba(255, 255, 255, 0.7);
   padding: 18px 18px 22px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .btn {

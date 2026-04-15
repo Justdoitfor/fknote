@@ -9,6 +9,7 @@
   --fk-radius-control: 14px;
   --fk-radius-surface: 18px;
   --fk-radius-block: 16px;
+  --fk-gutter: 1cm;
 
   --vp-c-bg: #ffffff;
   --vp-c-bg-alt: rgba(253, 224, 240, 0.22);
@@ -78,6 +79,13 @@ body {
 
 .VPSidebar {
   border-right: 1px solid rgb(224, 226, 232);
+}
+
+@media (min-width: 960px) {
+  #VPContent.VPContent.has-sidebar {
+    padding-left: calc(var(--vp-sidebar-width) + var(--fk-gutter)) !important;
+    padding-right: var(--fk-gutter) !important;
+  }
 }
 
 .VPNavBar {
@@ -297,11 +305,11 @@ div[class*='language-'] {
 
 @media (min-width: 960px) {
   .VPDoc {
-    padding: 36px 18px 0 !important;
+    padding: var(--fk-gutter) var(--fk-gutter) 0 !important;
   }
 
   .VPDoc .content {
-    padding: 0 18px 96px !important;
+    padding: 0 0 96px !important;
   }
 }
 
@@ -313,11 +321,11 @@ div[class*='language-'] {
 }
 
 .note-new-page {
-  padding: 24px;
+  padding: var(--fk-gutter) 0;
 }
 
 @media (min-width: 960px) {
   .note-new-page {
-    padding: 28px 32px;
+    padding: var(--fk-gutter) 0;
   }
 }
