@@ -35,6 +35,7 @@
   --vp-c-danger-soft: rgba(255, 198, 198, 0.65);
 
   --vp-layout-max-width: 1500px;
+  --vp-sidebar-width: 240px;
 }
 
 html {
@@ -122,6 +123,17 @@ a:hover {
 
 .VPHome .VPHero .text {
   color: var(--vp-c-text-2);
+}
+
+.VPHome .VPHero .text {
+  font-family: var(--fk-display-font);
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  font-size: clamp(18px, 5vw, 36px);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .VPHome .VPFeature {
@@ -252,4 +264,24 @@ div[class*='language-'] {
   box-shadow: var(--fk-ring);
   padding: 12px 14px;
   background: rgba(255, 255, 255, 0.8);
+}
+
+@media (min-width: 1280px) {
+  .VPDoc .aside {
+    max-width: 220px;
+    padding-left: 24px;
+  }
+
+  .VPDoc .aside-container,
+  .VPDoc .aside-curtain {
+    width: 200px;
+  }
+
+  .VPDoc.has-aside .content-container {
+    max-width: 840px;
+  }
+
+  .VPDoc .content {
+    min-width: 720px;
+  }
 }

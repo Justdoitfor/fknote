@@ -9,7 +9,8 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: '教程', link: '/tutorials/getting-started' },
-      { text: '日常笔记', link: '/notes/inbox' }
+      { text: '日常笔记', link: '/notes/inbox' },
+      { text: '新建', link: '/notes/new' }
     ],
     sidebar: {
       '/tutorials/': [
@@ -28,6 +29,7 @@ export default defineConfig({
         {
           text: '日常笔记',
           items: [
+            { text: '新建文档', link: '/notes/new' },
             { text: '收件箱', link: '/notes/inbox' },
             { text: '本周', link: '/notes/weekly' },
             { text: '模板', link: '/notes/templates' }
