@@ -11,6 +11,9 @@ type Doc = {
 }
 
 const STORAGE_KEY = 'fknote_docs_v1'
+const GIST_TOKEN_KEY = 'fknote_gist_token_v1'
+const GIST_ID_KEY = 'fknote_gist_id_v1'
+const GIST_FILE_NAME = 'fknote.json'
 
 function now() {
   return Date.now()
@@ -46,6 +49,18 @@ function saveDocs(docs: Doc[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(docs))
 }
 
+function loadString(key: string) {
+  try {
+    return localStorage.getItem(key) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function saveString(key: string, value: string) {
+  localStorage.setItem(key, value)
+}
+
 const md = new MarkdownIt({
   html: false,
   linkify: true,
@@ -61,6 +76,12 @@ const view = ref<'write' | 'preview'>('write')
 const savedAt = ref<number>(0)
 const saveState = ref<'idle' | 'saving' | 'saved'>('idle')
 
+const gistToken = ref('')
+const gistId = ref('')
+const cloudState = ref<'idle' | 'working' | 'ok' | 'error'>('idle')
+const cloudMessage = ref('')
+const cloudAt = ref<number>(0)
+
 let saveTimer: number | undefined
 
 function formatTime(ts: number) {
@@ -75,6 +96,121 @@ function formatTime(ts: number) {
 
 const activeDoc = computed(() => docs.value.find((d) => d.id === activeId.value) ?? null)
 const previewHtml = computed(() => md.render(content.value))
+
+function mergeDocs(localDocs: Doc[], remoteDocs: Doc[]) {
+  const map = new Map<string, Doc>()
+  for (const d of localDocs) map.set(d.id, d)
+  for (const d of remoteDocs) {
+    const cur = map.get(d.id)
+    if (!cur || d.updatedAt > cur.updatedAt) map.set(d.id, d)
+  }
+  return Array.from(map.values()).sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+async function githubJson<T>(url: string, init: RequestInit = {}) {
+  const token = gistToken.value.trim()
+  if (!token) throw new Error('请先填写 GitHub Token')
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`
+    }
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `请求失败 (${res.status})`)
+  }
+  return (await res.json()) as T
+}
+
+async function ensureGist() {
+  const id = gistId.value.trim()
+  if (id) return id
+  const created = await githubJson<{ id: string }>('https://api.github.com/gists', {
+    method: 'POST',
+    body: JSON.stringify({
+      description: 'FKNote sync',
+      public: false,
+      files: {
+        [GIST_FILE_NAME]: {
+          content: JSON.stringify(docs.value)
+        }
+      }
+    })
+  })
+  gistId.value = created.id
+  saveString(GIST_ID_KEY, created.id)
+  return created.id
+}
+
+async function cloudPush() {
+  cloudState.value = 'working'
+  cloudMessage.value = '同步中…'
+  try {
+    const id = await ensureGist()
+    await githubJson(`https://api.github.com/gists/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        files: {
+          [GIST_FILE_NAME]: {
+            content: JSON.stringify(docs.value)
+          }
+        }
+      })
+    })
+    cloudAt.value = now()
+    cloudState.value = 'ok'
+    cloudMessage.value = `已同步 · ${formatTime(cloudAt.value)}`
+  } catch (e) {
+    cloudState.value = 'error'
+    cloudMessage.value = e instanceof Error ? e.message : '同步失败'
+  }
+}
+
+async function cloudPull() {
+  cloudState.value = 'working'
+  cloudMessage.value = '拉取中…'
+  try {
+    const id = gistId.value.trim()
+    if (!id) throw new Error('请先填写 Gist ID 或先点击“同步到云端”创建')
+    const data = await githubJson<{
+      files?: Record<string, { content?: string }>
+    }>(`https://api.github.com/gists/${id}`)
+    const raw = data.files?.[GIST_FILE_NAME]?.content
+    if (!raw) throw new Error(`Gist 中未找到 ${GIST_FILE_NAME}`)
+    const remote = JSON.parse(raw) as Doc[]
+    if (!Array.isArray(remote)) throw new Error('云端数据格式不正确')
+    const merged = mergeDocs(docs.value, remote)
+    docs.value = merged
+    if (!merged.find((d) => d.id === activeId.value)) activeId.value = merged[0]?.id ?? ''
+    if (activeId.value) hydrateFromActive()
+    saveDocs(docs.value)
+    cloudAt.value = now()
+    cloudState.value = 'ok'
+    cloudMessage.value = `已拉取 · ${formatTime(cloudAt.value)}`
+  } catch (e) {
+    cloudState.value = 'error'
+    cloudMessage.value = e instanceof Error ? e.message : '拉取失败'
+  }
+}
+
+function cloudSaveCredentials() {
+  saveString(GIST_TOKEN_KEY, gistToken.value.trim())
+  saveString(GIST_ID_KEY, gistId.value.trim())
+  cloudState.value = 'ok'
+  cloudMessage.value = '凭证已保存到本地'
+}
+
+function cloudClearCredentials() {
+  gistToken.value = ''
+  gistId.value = ''
+  saveString(GIST_TOKEN_KEY, '')
+  saveString(GIST_ID_KEY, '')
+  cloudState.value = 'idle'
+  cloudMessage.value = ''
+}
 
 function commitToList(next: Partial<Doc>) {
   const idx = docs.value.findIndex((d) => d.id === activeId.value)
@@ -215,6 +351,8 @@ watch([title, tags, content], () => {
 
 onMounted(() => {
   docs.value = loadDocs()
+  gistToken.value = loadString(GIST_TOKEN_KEY)
+  gistId.value = loadString(GIST_ID_KEY)
   if (!docs.value.length) createDoc('daily')
   else {
     activeId.value = docs.value[0].id
@@ -247,6 +385,18 @@ const saveLabel = computed(() => {
           <input type="file" accept=".md,text/markdown" @change="(e) => (e.target && (e.target as HTMLInputElement).files?.[0] ? importMarkdown((e.target as HTMLInputElement).files![0]) : null)" />
           导入 Markdown
         </label>
+        <div class="cloud">
+          <div class="cloud-title">云端同步（GitHub Gist）</div>
+          <input v-model="gistToken" class="cloud-input" type="password" placeholder="GitHub Token（gist 读写）" />
+          <input v-model="gistId" class="cloud-input" placeholder="Gist ID（可留空自动创建）" />
+          <div class="cloud-actions">
+            <button class="btn ghost" type="button" @click="cloudSaveCredentials">保存凭证</button>
+            <button class="btn ghost" type="button" :disabled="cloudState === 'working'" @click="cloudPull">从云端拉取</button>
+            <button class="btn" type="button" :disabled="cloudState === 'working'" @click="cloudPush">同步到云端</button>
+            <button class="btn danger" type="button" @click="cloudClearCredentials">清除</button>
+          </div>
+          <div v-if="cloudMessage" class="cloud-status" :class="{ err: cloudState === 'error' }">{{ cloudMessage }}</div>
+        </div>
       </div>
 
       <div class="rail-list">
@@ -297,7 +447,7 @@ const saveLabel = computed(() => {
 <style scoped>
 .composer {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 240px 1fr;
   gap: 18px;
   align-items: start;
 }
@@ -349,6 +499,51 @@ const saveLabel = computed(() => {
 
 .import input {
   display: none;
+}
+
+.cloud {
+  margin-top: 12px;
+  border-radius: 16px;
+  box-shadow: rgb(224, 226, 232) 0px 0px 0px 1px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 10px;
+}
+
+.cloud-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--vp-c-text-2);
+  margin-bottom: 8px;
+}
+
+.cloud-input {
+  width: 100%;
+  border-radius: 14px;
+  box-shadow: rgb(224, 226, 232) 0px 0px 0px 1px;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 9px 10px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.cloud-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cloud-actions .btn {
+  justify-content: center;
+}
+
+.cloud-status {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--vp-c-text-2);
+}
+
+.cloud-status.err {
+  color: #600000;
 }
 
 .rail-list {
@@ -513,4 +708,3 @@ const saveLabel = computed(() => {
   box-shadow: rgb(224, 226, 232) 0px 0px 0px 1px;
 }
 </style>
-

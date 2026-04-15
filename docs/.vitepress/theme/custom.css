@@ -34,8 +34,8 @@
   --vp-c-danger-1: #600000;
   --vp-c-danger-soft: rgba(255, 198, 198, 0.65);
 
-  --vp-layout-max-width: 1500px;
-  --vp-sidebar-width: 240px;
+  --vp-layout-max-width: 1920px;
+  --vp-sidebar-width: 216px;
 }
 
 html {
@@ -74,6 +74,10 @@ body {
 .VPNavBar.has-sidebar .content,
 .VPNavBar.has-sidebar .divider {
   border-color: rgb(224, 226, 232);
+}
+
+.VPSidebar {
+  border-right: 1px solid rgb(224, 226, 232);
 }
 
 .VPNavBar {
@@ -249,11 +253,6 @@ div[class*='language-'] {
   background: rgba(91, 118, 254, 0.11);
 }
 
-.VPDocAsideOutline .content {
-  border-left: 0;
-  padding-left: 0;
-}
-
 .VPDocAsideOutline .outline-title {
   font-family: var(--fk-display-font);
   letter-spacing: -0.2px;
@@ -283,5 +282,22 @@ div[class*='language-'] {
 
   .VPDoc .content {
     min-width: 720px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .VPContent.has-sidebar {
+    padding-right: 24px !important;
+    padding-left: calc(24px + var(--vp-sidebar-width)) !important;
+  }
+}
+
+.note-new-page {
+  padding: 24px;
+}
+
+@media (min-width: 960px) {
+  .note-new-page {
+    padding: 28px 32px;
   }
 }
