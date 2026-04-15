@@ -4,6 +4,7 @@ export default defineConfig({
   lang: 'zh-CN',
   title: 'FKNote',
   description: '在线笔记与教程整理平台',
+  base: '/fknote/',
   lastUpdated: true,
   themeConfig: {
     nav: [
