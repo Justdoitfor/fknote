@@ -1,12 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Sora:wght@500;600;700&display=swap');
 
 :root {
   --vp-font-family-base: 'Noto Sans', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
   --vp-font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
+  --fk-display-font: 'Sora', 'Noto Sans', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  --fk-ring: rgb(224, 226, 232) 0px 0px 0px 1px;
+  --fk-radius-control: 14px;
+  --fk-radius-surface: 18px;
+  --fk-radius-block: 16px;
+
   --vp-c-bg: #ffffff;
-  --vp-c-bg-alt: #ffffff;
-  --vp-c-bg-soft: #ffffff;
+  --vp-c-bg-alt: rgba(253, 224, 240, 0.22);
+  --vp-c-bg-soft: rgba(195, 250, 245, 0.25);
   --vp-c-bg-elv: #ffffff;
 
   --vp-c-text-1: #1c1c1e;
@@ -39,6 +45,30 @@ body {
   color: var(--vp-c-text-1);
 }
 
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4,
+.VPHero .name,
+.VPNavBarTitle .title {
+  font-family: var(--fk-display-font);
+}
+
+.vp-doc h1 {
+  letter-spacing: -0.9px;
+}
+
+.vp-doc h2 {
+  letter-spacing: -0.5px;
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 40px;
+}
+
+.vp-doc h3 {
+  margin-top: 26px;
+}
+
 .VPSidebar,
 .VPNavBar.has-sidebar .content,
 .VPNavBar.has-sidebar .divider {
@@ -50,16 +80,14 @@ body {
   backdrop-filter: saturate(180%) blur(12px);
 }
 
-.VPNavBar .content {
-  box-shadow: rgb(224, 226, 232) 0 0 0 1px;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
-  margin: 10px 12px 0;
+.VPNavBar {
+  border-bottom: 1px solid rgb(224, 226, 232);
 }
 
-.VPNavBar.has-sidebar .content {
-  margin-left: 12px;
-  margin-right: 12px;
+.VPNavBar .content {
+  box-shadow: none;
+  border-radius: 0;
+  margin: 0;
 }
 
 .VPNavBarTitle .title {
@@ -67,46 +95,20 @@ body {
   letter-spacing: -0.3px;
 }
 
-.VPButton.brand {
-  border-radius: 10px;
+.VPButton {
+  border-radius: var(--fk-radius-control);
 }
 
 .VPButton.alt {
-  border-radius: 10px;
   border: 1px solid #c7cad5;
 }
 
+.VPSidebar,
 .VPDoc .content-container,
-.VPDocAside,
-.VPSidebar {
-  border-radius: 24px;
-}
-
-.VPSidebar {
-  box-shadow: rgb(224, 226, 232) 0 0 0 1px;
-  margin: 12px 0 12px 12px;
-  height: calc(100vh - 24px);
-}
-
-.VPSidebar .nav {
-  padding-top: 16px;
-}
-
-.VPDoc .content-container {
-  box-shadow: rgb(224, 226, 232) 0 0 0 1px;
-  margin: 12px 12px 12px 0;
-}
-
-.VPDoc.has-aside .content-container {
-  margin-right: 12px;
-}
-
-.VPDoc h1 {
-  letter-spacing: -0.9px;
-}
-
-.VPDoc h2 {
-  letter-spacing: -0.5px;
+.VPDocAside {
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
 }
 
 .VPLink.link:hover,
@@ -123,19 +125,19 @@ a:hover {
 }
 
 .VPHome .VPFeature {
-  border-radius: 24px;
-  box-shadow: rgb(224, 226, 232) 0 0 0 1px;
+  border-radius: var(--fk-radius-surface);
+  box-shadow: var(--fk-ring);
 }
 
-.VPHome .VPFeature:nth-child(1) {
+.VPHome .VPFeatures .item:nth-child(1) .VPFeature {
   background: #ffc6c6;
 }
 
-.VPHome .VPFeature:nth-child(2) {
+.VPHome .VPFeatures .item:nth-child(2) .VPFeature {
   background: #c3faf5;
 }
 
-.VPHome .VPFeature:nth-child(3) {
+.VPHome .VPFeatures .item:nth-child(3) .VPFeature {
   background: #ffe6cd;
 }
 
@@ -148,13 +150,13 @@ a:hover {
 }
 
 .VPCopyButton {
-  border-radius: 10px;
+  border-radius: var(--fk-radius-control);
 }
 
 .vp-code-group,
 .vp-admonition {
-  border-radius: 20px;
-  box-shadow: rgb(224, 226, 232) 0 0 0 1px;
+  border-radius: var(--fk-radius-block);
+  box-shadow: var(--fk-ring);
   overflow: hidden;
 }
 
@@ -164,5 +166,90 @@ a:hover {
 
 .vp-doc blockquote {
   border-left: 4px solid rgba(91, 118, 254, 0.35);
-  border-radius: 12px;
+  border-radius: var(--fk-radius-block);
+}
+
+.vp-doc :not(pre) > code {
+  border-radius: 10px;
+}
+
+.vp-doc table {
+  display: block;
+  width: 100%;
+  overflow: auto;
+  border-radius: var(--fk-radius-block);
+  box-shadow: var(--fk-ring);
+}
+
+.vp-doc table tr:nth-child(2n) {
+  background-color: rgba(253, 224, 240, 0.25);
+}
+
+.vp-doc table th,
+.vp-doc table td {
+  border-color: rgb(224, 226, 232);
+}
+
+.pager-link {
+  border-radius: var(--fk-radius-control);
+  box-shadow: var(--fk-ring);
+  border: 0;
+}
+
+.custom-block {
+  border-radius: var(--fk-radius-block);
+  box-shadow: var(--fk-ring);
+  border: 0;
+}
+
+div[class*='language-'] {
+  border-radius: var(--fk-radius-block);
+  box-shadow: var(--fk-ring);
+}
+
+.vp-code-group .tabs {
+  border-top-left-radius: var(--fk-radius-block);
+  border-top-right-radius: var(--fk-radius-block);
+}
+
+.DocSearch-Button {
+  border-radius: var(--fk-radius-control);
+}
+
+.DocSearch-Button-Key {
+  border-radius: 10px 0 0 10px;
+}
+
+.DocSearch-Button-Key + .DocSearch-Button-Key {
+  border-radius: 0 10px 10px 0;
+}
+
+.VPSidebarItem > .item {
+  border-radius: var(--fk-radius-control);
+  padding: 0 10px;
+}
+
+.VPSidebarItem.is-link > .item:hover {
+  background: rgba(91, 118, 254, 0.08);
+}
+
+.VPSidebarItem.is-active > .item {
+  background: rgba(91, 118, 254, 0.11);
+}
+
+.VPDocAsideOutline .content {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.VPDocAsideOutline .outline-title {
+  font-family: var(--fk-display-font);
+  letter-spacing: -0.2px;
+}
+
+.VPDocAsideOutline {
+  border-radius: var(--fk-radius-surface);
+  box-shadow: var(--fk-ring);
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.8);
 }

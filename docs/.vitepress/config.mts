@@ -18,7 +18,9 @@ export default defineConfig({
           items: [
             { text: '快速开始', link: '/tutorials/getting-started' },
             { text: '组织结构', link: '/tutorials/organize' },
-            { text: '写作规范', link: '/tutorials/writing' }
+            { text: '写作规范', link: '/tutorials/writing' },
+            { text: '展示页', link: '/tutorials/showcase' },
+            { text: '长文示例', link: '/tutorials/sample-long' }
           ]
         }
       ],
